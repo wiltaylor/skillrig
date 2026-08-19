@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev --python ${{ matrix.python }}
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+        continue-on-error: true
+      # These cover parsing, turn merging, and the fakes against recorded CLI
+      # output. Tests that drive a real agent cost money and need credentials, so
+      # they are run by hand rather than here.
+      - run: uv run pytest tests -q

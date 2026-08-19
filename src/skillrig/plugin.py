@@ -37,6 +37,10 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "harness(*names): restrict a test to these harnesses")
+    # Every skill names its tests test.py, so the default import mode would see a
+    # module basename collision the moment a second skill is collected.
+    if config.getoption("importmode") == "prepend":
+        config.option.importmode = "importlib"
     config.skillrig = Config.load(Path(config.rootpath))
     if selected := config.getoption("--harness"):
         config.skillrig.harnesses = (
@@ -51,6 +55,18 @@ def pytest_configure(config):
 
     config.skillrig_records = {}
     config.skillrig_setup_time = {}
+
+
+def pytest_collect_file(file_path, parent):
+    """Collect `skills/<name>/test.py`, which pytest's default pattern misses.
+
+    The convention is one test file named for what it is, sitting beside the
+    SKILL.md it covers. `test_*.py` inside a `test/` directory is collected by
+    pytest as usual.
+    """
+    if file_path.name == "test.py":
+        return pytest.Module.from_parent(parent, path=file_path)
+    return None
 
 
 def pytest_generate_tests(metafunc):

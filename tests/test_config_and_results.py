@@ -1,4 +1,4 @@
-"""Settings resolution and the results file."""
+"""Settings resolution, collection, and the results file."""
 
 import json
 
@@ -7,6 +7,8 @@ import pytest
 from skillrig import results
 from skillrig.config import Config
 from skillrig.plugin import skill_dir_for
+
+pytest_plugins = ["pytester"]
 
 
 @pytest.fixture(autouse=True)
@@ -117,3 +119,20 @@ def test_status_summarises_one_row_per_skill_and_column_group_per_harness(tmp_pa
     assert "alpha" in rendered and "beta" in rendered
     assert "pass" in rendered and "FAIL" in rendered
     assert "n/a" in rendered
+
+
+def test_a_skill_test_file_is_collected_once_not_twice(pytester):
+    """test.py must be collected by the pattern, not by a second hook on top."""
+    pytester.makepyfile(
+        **{
+            "skills/demo/test": "def test_one():\n    assert True\n",
+        }
+    )
+    (pytester.path / "skills" / "demo" / "SKILL.md").write_text("---\nname: demo\n---\n")
+
+    def collected(*arguments) -> int:
+        outcomes = pytester.runpytest(*arguments, "--collect-only", "-q").parseoutcomes()
+        return outcomes.get("test", outcomes.get("tests", 0))
+
+    assert collected() == 1, "collecting the directory found it more than once"
+    assert collected("skills/demo/test.py") == 1, "naming the file explicitly collected it twice"

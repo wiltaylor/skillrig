@@ -37,6 +37,15 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "harness(*names): restrict a test to these harnesses")
+    # The convention is one test file named for what it is, beside the SKILL.md it
+    # covers, which pytest's default `test_*.py` pattern does not match. Extending
+    # the pattern rather than collecting the file directly keeps pytest's own
+    # handling of explicitly named files, which would otherwise collect it twice
+    # and run every test in it twice.
+    patterns = config.getini("python_files")
+    if "test.py" not in patterns:
+        patterns.append("test.py")
+
     # Every skill names its tests test.py, so the default import mode would see a
     # module basename collision the moment a second skill is collected.
     if config.getoption("importmode") == "prepend":
@@ -55,18 +64,6 @@ def pytest_configure(config):
 
     config.skillrig_records = {}
     config.skillrig_setup_time = {}
-
-
-def pytest_collect_file(file_path, parent):
-    """Collect `skills/<name>/test.py`, which pytest's default pattern misses.
-
-    The convention is one test file named for what it is, sitting beside the
-    SKILL.md it covers. `test_*.py` inside a `test/` directory is collected by
-    pytest as usual.
-    """
-    if file_path.name == "test.py":
-        return pytest.Module.from_parent(parent, path=file_path)
-    return None
 
 
 def pytest_generate_tests(metafunc):

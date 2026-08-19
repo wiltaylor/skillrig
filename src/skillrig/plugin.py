@@ -236,5 +236,9 @@ def pytest_sessionfinish(session):
 
     for source, records in by_file.items():
         skill = skill_dir_for(source)
-        path = results.path_for(source, config.skillrig.results)
-        results.merge(path, skill.name if skill else "", records)
+        if skill is None:
+            # A results file describes a skill. Tests that sit outside one -- a
+            # project's own suite, with skillrig merely installed -- have nothing
+            # to describe, so they leave nothing behind.
+            continue
+        results.merge(results.path_for(source, config.skillrig.results), skill.name, records)

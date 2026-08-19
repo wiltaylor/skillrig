@@ -136,3 +136,22 @@ def test_a_skill_test_file_is_collected_once_not_twice(pytester):
 
     assert collected() == 1, "collecting the directory found it more than once"
     assert collected("skills/demo/test.py") == 1, "naming the file explicitly collected it twice"
+
+
+def test_tests_outside_a_skill_leave_no_results_behind(pytester):
+    """skillrig is installed alongside other suites; only skills get a results file."""
+    pytester.makepyfile(test_ordinary="def test_one():\n    assert True\n")
+    pytester.runpytest("-q").assert_outcomes(passed=1)
+
+    assert not list(pytester.path.rglob("results.json"))
+
+
+def test_a_skill_test_records_its_result_beside_the_skill(pytester):
+    pytester.makepyfile(**{"skills/demo/test": "def test_one():\n    assert True\n"})
+    (pytester.path / "skills" / "demo" / "SKILL.md").write_text("---\nname: demo\n---\n")
+
+    pytester.runpytest("-q").assert_outcomes(passed=1)
+
+    recorded = json.loads((pytester.path / "skills" / "demo" / "results.json").read_text())
+    assert recorded["skill"] == "demo"
+    assert recorded["runs"]["test_one"]["outcome"] == "passed"

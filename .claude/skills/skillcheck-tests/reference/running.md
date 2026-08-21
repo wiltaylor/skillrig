@@ -10,7 +10,7 @@ Harnesses, settings, flags, and what a run records.
 | `codex` | `codex` | `.agents/skills/` | `.agents/agents/` | yes |
 | `opencode` | `opencode` | `.agents/skills/`, `.opencode/skills/` | `.opencode/agent/` | no |
 
-By default skillrig uses the first of `claude`, `codex`, `opencode` that is
+By default skillcheck uses the first of `claude`, `codex`, `opencode` that is
 installed. A harness whose CLI is missing skips rather than fails, and a test can
 restrict itself:
 
@@ -28,46 +28,46 @@ catch a run that escaped.
 
 ## Settings
 
-Environment first, `[tool.skillrig]` in `pyproject.toml` second, defaults last.
+Environment first, `[tool.skillcheck]` in `pyproject.toml` second, defaults last.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SKILLRIG_HARNESS` | first installed | `claude`, `claude,codex`, or `all` |
-| `SKILLRIG_MODEL` | the CLI's own | model for every harness |
-| `SKILLRIG_MODEL_<HARNESS>` | — | per-harness model, e.g. `SKILLRIG_MODEL_OPENCODE` |
-| `SKILLRIG_JUDGE` | `claude` | `claude`, `anthropic`, or your own callable |
-| `SKILLRIG_JUDGE_MODEL` | `sonnet` | model the judge grades with |
-| `SKILLRIG_TIMEOUT` | `900` | per-turn seconds |
-| `SKILLRIG_RESULTS` | next to the test | where results are written |
-| `SKILLRIG_RECORD` | `1` | set `0` to run without recording |
+| `SKILLCHECK_HARNESS` | first installed | `claude`, `claude,codex`, or `all` |
+| `SKILLCHECK_MODEL` | the CLI's own | model for every harness |
+| `SKILLCHECK_MODEL_<HARNESS>` | — | per-harness model, e.g. `SKILLCHECK_MODEL_OPENCODE` |
+| `SKILLCHECK_JUDGE` | `claude` | `claude`, `anthropic`, or your own callable |
+| `SKILLCHECK_JUDGE_MODEL` | `sonnet` | model the judge grades with |
+| `SKILLCHECK_TIMEOUT` | `900` | per-turn seconds |
+| `SKILLCHECK_RESULTS` | next to the test | where results are written |
+| `SKILLCHECK_RECORD` | `1` | set `0` to run without recording |
 
 ```sh
-SKILLRIG_HARNESS=all ./.claude/skills/my-skill/test.py
+SKILLCHECK_HARNESS=all ./.claude/skills/my-skill/test.py
 ```
 
 ## pytest flags
 
-skillrig adds `--harness`, `--skill-model`, `--skill-timeout`, `--keep-workspace`,
+skillcheck adds `--harness`, `--skill-model`, `--skill-timeout`, `--keep-workspace`,
 and `--no-record`. `--keep-workspace` prints the workspace path and leaves it on
 disk, which is the fastest way to see what the agent actually wrote.
 
-Installing skillrig is enough — it registers as a pytest plugin, extends
+Installing skillcheck is enough — it registers as a pytest plugin, extends
 `python_files` to collect `test.py`, and switches to importlib import mode so two
 skills' `test.py` files do not collide.
 
 ## The CLI
 
 ```sh
-skillrig test .claude/skills/my-skill     # run a skill's tests
-skillrig status .claude/skills/           # what was tested, and when
-skillrig doctor                           # installed harnesses and settings
-skillrig new-test .claude/skills/my-skill # scaffold test.py (--force to overwrite)
+skillcheck test .claude/skills/my-skill     # run a skill's tests
+skillcheck status .claude/skills/           # what was tested, and when
+skillcheck doctor                           # installed harnesses and settings
+skillcheck new-test .claude/skills/my-skill # scaffold test.py (--force to overwrite)
 ```
 
 ## Results
 
 Each run records to `results.json` beside the test file that produced it, so a
-skill carries the record of what it was tested on. `skillrig status` renders it:
+skill carries the record of what it was tested on. `skillcheck status` renders it:
 
 ```
          claude                     codex

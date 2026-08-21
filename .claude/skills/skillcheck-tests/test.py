@@ -1,13 +1,13 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["skillrig"]
+# dependencies = ["pytest-skillcheck"]
 # ///
-"""Tests for the skillrig-tests skill. Run it directly: ./.claude/skills/skillrig-tests/test.py"""
+"""Tests for the skillcheck-tests skill. Run it directly: ./.claude/skills/skillcheck-tests/test.py"""
 
 import re
 
-from skillrig import main
+from skillcheck import main
 
 NOTE_TAKER = """\
 ---
@@ -63,8 +63,8 @@ def test_writes_a_runnable_test_beside_the_skill(run_skill):
 
     written = result.read(".claude/skills/note-taker/test.py")
     assert "uv run --script" in written
-    assert re.search(r"dependencies\s*=\s*\[[^\]]*skillrig", written), written
-    assert "from skillrig import main" in written
+    assert re.search(r"dependencies\s*=\s*\[[^\]]*skillcheck", written), written
+    assert "from skillcheck import main" in written
     assert "main(__file__)" in written
     assert "run_skill" in written
 

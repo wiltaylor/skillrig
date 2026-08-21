@@ -4,5 +4,5 @@ __pycache__/
 dist/
 .venv/
 
-# skillrig records results for skills; nothing else should appear.
+# skillcheck records results for skills; nothing else should appear.
 results.json

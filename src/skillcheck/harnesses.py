@@ -15,12 +15,12 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 # Workspace-relative directories and files that belong to a harness, not a test.
-HARNESS_DIRS = {".claude", ".agents", ".codex", ".opencode", ".git", ".skillrig"}
+HARNESS_DIRS = {".claude", ".agents", ".codex", ".opencode", ".git", ".skillcheck"}
 HARNESS_FILES = {"opencode.json"}
 
 # Where fake binaries and their state live inside the workspace.
-FAKE_BIN = ".skillrig/bin"
-FAKE_STATE = ".skillrig/state"
+FAKE_BIN = ".skillcheck/bin"
+FAKE_STATE = ".skillcheck/state"
 
 
 @dataclass
@@ -304,7 +304,7 @@ class Harness:
         env = dict(self.isolate(workspace.parent))
         if (workspace / FAKE_BIN).is_dir():
             env["PATH"] = f"{workspace / FAKE_BIN}:{os.environ.get('PATH', '')}"
-            env["SKILLRIG_FAKE_STATE"] = str(workspace / FAKE_STATE)
+            env["SKILLCHECK_FAKE_STATE"] = str(workspace / FAKE_STATE)
             env["GIT_CONFIG_GLOBAL"] = str(workspace / FAKE_STATE / "gitconfig")
         return env
 

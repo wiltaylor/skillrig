@@ -6,8 +6,8 @@ name: release
 #
 # Publishing uses PyPI Trusted Publishing, so there is no token to store: PyPI
 # verifies this workflow's OIDC identity instead. Register the publisher once at
-# https://pypi.org/manage/project/skillrig/settings/publishing/ with owner
-# wiltaylor, repository skillrig, workflow release.yml, environment pypi.
+# https://pypi.org/manage/project/pytest-skillcheck/settings/publishing/ with owner
+# wiltaylor, repository pytest-skillcheck, workflow release.yml, environment pypi.
 
 on:
   push:

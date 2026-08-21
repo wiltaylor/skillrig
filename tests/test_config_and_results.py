@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from skillrig import results
-from skillrig.config import Config
-from skillrig.plugin import skill_dir_for
+from skillcheck import results
+from skillcheck.config import Config
+from skillcheck.plugin import skill_dir_for
 
 pytest_plugins = ["pytester"]
 
@@ -14,30 +14,30 @@ pytest_plugins = ["pytester"]
 @pytest.fixture(autouse=True)
 def clean_environment(monkeypatch):
     for name in list(dict(__import__("os").environ)):
-        if name.startswith("SKILLRIG_"):
+        if name.startswith("SKILLCHECK_"):
             monkeypatch.delenv(name, raising=False)
 
 
 def test_defaults_to_the_first_installed_harness(monkeypatch, tmp_path):
-    monkeypatch.setattr("skillrig.config.installed", lambda names=None: ["codex", "opencode"])
+    monkeypatch.setattr("skillcheck.config.installed", lambda names=None: ["codex", "opencode"])
     assert Config.load(tmp_path).harnesses == ["codex"]
 
 
 def test_environment_selects_one_harness_a_group_or_all(monkeypatch, tmp_path):
-    monkeypatch.setenv("SKILLRIG_HARNESS", "codex")
+    monkeypatch.setenv("SKILLCHECK_HARNESS", "codex")
     assert Config.load(tmp_path).harnesses == ["codex"]
 
-    monkeypatch.setenv("SKILLRIG_HARNESS", "claude, opencode")
+    monkeypatch.setenv("SKILLCHECK_HARNESS", "claude, opencode")
     assert Config.load(tmp_path).harnesses == ["claude", "opencode"]
 
-    monkeypatch.setenv("SKILLRIG_HARNESS", "all")
+    monkeypatch.setenv("SKILLCHECK_HARNESS", "all")
     assert Config.load(tmp_path).harnesses == ["claude", "codex", "opencode"]
 
 
 def test_pyproject_supplies_settings_and_the_environment_overrides_them(monkeypatch, tmp_path):
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.skillrig]\nharness = 'codex'\ntimeout = 60\n"
-        "judge_model = 'haiku'\n[tool.skillrig.models]\nopencode = 'zai/glm-5.3'\n"
+        "[tool.skillcheck]\nharness = 'codex'\ntimeout = 60\n"
+        "judge_model = 'haiku'\n[tool.skillcheck.models]\nopencode = 'zai/glm-5.3'\n"
     )
 
     settings = Config.load(tmp_path)
@@ -47,9 +47,9 @@ def test_pyproject_supplies_settings_and_the_environment_overrides_them(monkeypa
     assert settings.model_for("opencode") == "zai/glm-5.3"
     assert settings.model_for("claude") is None
 
-    monkeypatch.setenv("SKILLRIG_TIMEOUT", "5")
-    monkeypatch.setenv("SKILLRIG_MODEL_CLAUDE", "opus")
-    monkeypatch.setenv("SKILLRIG_MODEL", "sonnet")
+    monkeypatch.setenv("SKILLCHECK_TIMEOUT", "5")
+    monkeypatch.setenv("SKILLCHECK_MODEL_CLAUDE", "opus")
+    monkeypatch.setenv("SKILLCHECK_MODEL", "sonnet")
     settings = Config.load(tmp_path)
     assert settings.timeout == 5
     assert settings.model_for("claude") == "opus"
@@ -139,7 +139,7 @@ def test_a_skill_test_file_is_collected_once_not_twice(pytester):
 
 
 def test_tests_outside_a_skill_leave_no_results_behind(pytester):
-    """skillrig is installed alongside other suites; only skills get a results file."""
+    """skillcheck is installed alongside other suites; only skills get a results file."""
     pytester.makepyfile(test_ordinary="def test_one():\n    assert True\n")
     pytester.runpytest("-q").assert_outcomes(passed=1)
 

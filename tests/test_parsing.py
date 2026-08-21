@@ -6,7 +6,7 @@ changes its output, this is where it should break first.
 
 import json
 
-from skillrig.harnesses import (
+from skillcheck.harnesses import (
     ClaudeHarness,
     CodexHarness,
     OpencodeHarness,
@@ -109,7 +109,7 @@ def test_asks_question_covers_requests_without_a_question_mark():
 
 
 def make_result(harness, output, tools=(), exit_code=0):
-    from skillrig.harnesses import RunResult
+    from skillcheck.harnesses import RunResult
 
     return RunResult(
         harness=harness,
@@ -125,7 +125,7 @@ def make_result(harness, output, tools=(), exit_code=0):
 
 
 def test_merging_turns_keeps_handbacks_and_the_opening_tool_calls():
-    from skillrig.harnesses import ToolUse
+    from skillcheck.harnesses import ToolUse
 
     opening = [ToolUse("Bash", {"command": "ls"})]
     first = make_result("claude", "Plan looks like this. Proceed?", opening)

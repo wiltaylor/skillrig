@@ -9,7 +9,7 @@ else loudly, so a skill reaching for an unexpected GitHub call fails the test
 instead of quietly doing something real. Every invocation is appended to
 calls.jsonl for the test to assert on.
 
-`gh --skillrig-fake` prints a marker. skillrig checks for it before letting a
+`gh --skillcheck-fake` prints a marker. skillcheck checks for it before letting a
 model run, so a broken PATH is caught while it is still harmless.
 
 The fixture maps "owner/name" to whatever fields the test wants answered:
@@ -22,9 +22,9 @@ import os
 import sys
 from pathlib import Path
 
-MARKER = "skillrig-fake"
+MARKER = "skillcheck-fake"
 
-STATE = Path(os.environ["SKILLRIG_FAKE_STATE"]) / "gh"
+STATE = Path(os.environ["SKILLCHECK_FAKE_STATE"]) / "gh"
 FIXTURE = STATE / "fixture.json"
 CALLS = STATE / "calls.jsonl"
 
@@ -116,7 +116,7 @@ def main() -> None:
     if not args:
         refuse("called with no arguments")
 
-    if args[0] == "--skillrig-fake":
+    if args[0] == "--skillcheck-fake":
         log("ok")
         print(MARKER)
         return

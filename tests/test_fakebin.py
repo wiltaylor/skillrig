@@ -6,8 +6,8 @@ import subprocess
 
 import pytest
 
-from skillrig import fakebin
-from skillrig.harnesses import FAKE_BIN, FAKE_STATE, ClaudeHarness
+from skillcheck import fakebin
+from skillcheck.harnesses import FAKE_BIN, FAKE_STATE, ClaudeHarness
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_install_puts_an_executable_stub_and_its_fixture_in_place(workspace):
 def test_the_stub_answers_the_marker_and_the_commands_it_knows(workspace):
     fakebin.install(workspace, "gh", {"me/proj": {"visibility": "PUBLIC", "contents": ["old"]}})
 
-    assert fakebin.MARKER in run_gh(workspace, "--skillrig-fake").stdout
+    assert fakebin.MARKER in run_gh(workspace, "--skillcheck-fake").stdout
     view = run_gh(workspace, "repo", "view", "me/proj", "--json", "visibility", "-q", ".visibility")
     assert view.stdout.strip() == "PUBLIC"
     listing = run_gh(workspace, "api", "repos/me/proj/contents", "-q", ".[].name")
@@ -68,7 +68,7 @@ def test_delete_is_recorded_and_needs_confirmation(workspace):
 
 
 def test_calls_are_logged_for_a_test_to_assert_on(workspace, tmp_path):
-    from skillrig.harnesses import RunResult
+    from skillcheck.harnesses import RunResult
 
     fakebin.install(workspace, "gh", {"me/proj": {"visibility": "PUBLIC"}})
     run_gh(workspace, "repo", "view", "me/proj")
@@ -81,7 +81,7 @@ def test_calls_are_logged_for_a_test_to_assert_on(workspace, tmp_path):
 
 
 def test_verify_refuses_when_path_does_not_resolve_to_the_stub(workspace):
-    with pytest.raises(RuntimeError, match="not the skillrig fake"):
+    with pytest.raises(RuntimeError, match="not the skillcheck fake"):
         fakebin.verify(ClaudeHarness(), workspace, "gh")
 
 
@@ -100,7 +100,7 @@ def test_git_is_blocked_from_reaching_a_real_forge(workspace):
         env={**os.environ, **harness.environment(workspace)},
     )
     assert reach.returncode != 0
-    assert "blocked-by-skillrig" in reach.stderr
+    assert "blocked-by-skillcheck" in reach.stderr
 
     identity = subprocess.run(
         ["git", "config", "user.email"],
@@ -113,5 +113,5 @@ def test_git_is_blocked_from_reaching_a_real_forge(workspace):
 
 
 def test_asking_for_a_fake_that_does_not_exist_says_what_ships(workspace):
-    with pytest.raises(FileNotFoundError, match="skillrig ships"):
+    with pytest.raises(FileNotFoundError, match="skillcheck ships"):
         fakebin.install(workspace, "kubectl", {})

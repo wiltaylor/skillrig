@@ -1,21 +1,24 @@
-# skillrig
+# pytest-skillcheck
+
+[![CI](https://github.com/wiltaylor/pytest-skillcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/wiltaylor/pytest-skillcheck/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/pytest-skillcheck)](https://pypi.org/project/pytest-skillcheck/)
 
 Test agent skills against real coding agents. Run a prompt, assert on what
 actually happened, and grade the rest with an LLM.
 
 A skill is a folder of instructions you hand to a coding agent. Nothing checks
-that the agent still follows them after you edit the wording. skillrig runs the
+that the agent still follows them after you edit the wording. skillcheck runs the
 real CLI against a throwaway workspace and tells you.
 
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["skillrig"]
+# dependencies = ["pytest-skillcheck"]
 # ///
 """Tests for the git-graveyard skill."""
 
-from skillrig import main
+from skillcheck import main
 
 
 def test_buries_a_public_repo_in_the_public_graveyard(run_skill):
@@ -39,18 +42,61 @@ Save that as `skills/git-graveyard/test.py`, `chmod +x`, and run it:
 ./skills/git-graveyard/test.py
 ```
 
-uv fetches skillrig, pytest runs, and the skill under test is the one the file
+uv fetches pytest-skillcheck, pytest runs, and the skill under test is the one the file
 lives in — no `skill=` argument, no `conftest.py`.
+
+## Contents
+
+- [Install](#install)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [Harnesses](#harnesses)
+- [Settings](#settings)
+- [Writing tests](#writing-tests)
+- [Results](#results)
+- [Commands](#commands)
+- [Cost, and what CI can cover](#cost-and-what-ci-can-cover)
+- [Adding a harness](#adding-a-harness)
+- [Licence](#licence)
 
 ## Install
 
 ```sh
-uv add skillrig          # or: pip install skillrig
-skillrig doctor          # which agent CLIs are installed, and what they would run
+uv add pytest-skillcheck          # or: pip install pytest-skillcheck
+skillcheck doctor          # which agent CLIs are installed, and what they would run
 ```
 
-skillrig is a pytest plugin, so its fixtures are available anywhere pytest runs
+skillcheck is a pytest plugin, so its fixtures are available anywhere pytest runs
 once it is installed.
+
+## Usage
+
+Scaffold a test beside a skill, then run it:
+
+```sh
+skillcheck new-test skills/my-skill    # writes skills/my-skill/test.py
+chmod +x skills/my-skill/test.py
+./skills/my-skill/test.py
+```
+
+The file knows which skill it covers from where it sits, so nothing tells it
+twice. Each run appends to `results.json` beside it, and `skillcheck status
+skills/` reads those back.
+
+## Contributing
+
+Pull requests are welcome, new harnesses most of all. Run what CI runs before you
+open one:
+
+```sh
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run pytest tests -q
+```
+
+That suite covers parsing and the fake-binary machinery against recorded CLI
+output. It cannot run a real agent, so anything you change in a harness needs a
+skill test run by hand as well.
 
 ## Harnesses
 
@@ -60,13 +106,13 @@ once it is installed.
 | `codex` | `codex` | `.agents/skills/` | `.agents/agents/` | yes |
 | `opencode` | `opencode` | `.agents/skills/`, `.opencode/skills/` | `.opencode/agent/` | no |
 
-By default skillrig uses the first of `claude`, `codex`, `opencode` that is
-installed. Override with `SKILLRIG_HARNESS`:
+By default skillcheck uses the first of `claude`, `codex`, `opencode` that is
+installed. Override with `SKILLCHECK_HARNESS`:
 
 ```sh
-SKILLRIG_HARNESS=codex ./skills/my-skill/test.py
-SKILLRIG_HARNESS=claude,opencode ./skills/my-skill/test.py
-SKILLRIG_HARNESS=all ./skills/my-skill/test.py
+SKILLCHECK_HARNESS=codex ./skills/my-skill/test.py
+SKILLCHECK_HARNESS=claude,opencode ./skills/my-skill/test.py
+SKILLCHECK_HARNESS=all ./skills/my-skill/test.py
 ```
 
 A test can restrict itself with `@pytest.mark.harness("claude", "opencode")`, and
@@ -81,18 +127,18 @@ result.reached_home()` to catch this.
 
 ## Settings
 
-Environment first, `[tool.skillrig]` in `pyproject.toml` second, defaults last.
+Environment first, `[tool.skillcheck]` in `pyproject.toml` second, defaults last.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SKILLRIG_HARNESS` | first installed | `claude`, `claude,codex`, or `all` |
-| `SKILLRIG_MODEL` | the CLI's own | model for every harness |
-| `SKILLRIG_MODEL_<HARNESS>` | — | per-harness model, e.g. `SKILLRIG_MODEL_OPENCODE` |
-| `SKILLRIG_JUDGE` | `claude` | `claude`, `anthropic`, or your own callable |
-| `SKILLRIG_JUDGE_MODEL` | `sonnet` | model the judge grades with |
-| `SKILLRIG_TIMEOUT` | `900` | per-turn seconds |
-| `SKILLRIG_RESULTS` | next to the test | where results are written |
-| `SKILLRIG_RECORD` | `1` | set `0` to run without recording |
+| `SKILLCHECK_HARNESS` | first installed | `claude`, `claude,codex`, or `all` |
+| `SKILLCHECK_MODEL` | the CLI's own | model for every harness |
+| `SKILLCHECK_MODEL_<HARNESS>` | — | per-harness model, e.g. `SKILLCHECK_MODEL_OPENCODE` |
+| `SKILLCHECK_JUDGE` | `claude` | `claude`, `anthropic`, or your own callable |
+| `SKILLCHECK_JUDGE_MODEL` | `sonnet` | model the judge grades with |
+| `SKILLCHECK_TIMEOUT` | `900` | per-turn seconds |
+| `SKILLCHECK_RESULTS` | next to the test | where results are written |
+| `SKILLCHECK_RECORD` | `1` | set `0` to run without recording |
 
 ## Writing tests
 
@@ -129,7 +175,7 @@ assert not result.acted_before_asking(r"--allow-unrelated-histories")
 
 ### Skills that call out to services
 
-`fake` puts a stub binary first on `PATH`, backed by a fixture. skillrig ships a
+`fake` puts a stub binary first on `PATH`, backed by a fixture. skillcheck ships a
 `gh` fake; the stub answers what the fixture describes and **refuses everything
 else loudly**, so a skill reaching for an unanticipated command fails the test
 rather than doing something real.
@@ -143,9 +189,9 @@ assert not result.refusals("gh")     # nothing unexpected was attempted
 Four things stand between a test and real infrastructure, and the run only starts
 once all of them hold:
 
-1. The stub goes first on `PATH`, and skillrig runs `gh --skillrig-fake` itself.
+1. The stub goes first on `PATH`, and skillcheck runs `gh --skillcheck-fake` itself.
 2. The agent then runs the same check in a throwaway session of its own. Checking
-   skillrig's environment proves nothing about the shell the agent's tools run
+   skillcheck's environment proves nothing about the shell the agent's tools run
    in, which can rebuild `PATH` from a profile.
 3. `GIT_CONFIG_GLOBAL` rewrites every github.com and gitlab.com URL to a path
    that does not exist, so git cannot reach a forge either. It also carries an
@@ -186,7 +232,7 @@ do not have can send the result back as a pull request, and a bug report can
 point at the row that failed.
 
 ```sh
-skillrig status skills/
+skillcheck status skills/
 ```
 
 ```
@@ -203,16 +249,16 @@ before you change the skill.
 ## Commands
 
 ```sh
-skillrig test skills/my-skill     # run a skill's tests
-skillrig status skills/           # what was tested, and when
-skillrig doctor                   # installed harnesses and settings
-skillrig new-test skills/my-skill # scaffold test.py
+skillcheck test skills/my-skill     # run a skill's tests
+skillcheck status skills/           # what was tested, and when
+skillcheck doctor                   # installed harnesses and settings
+skillcheck new-test skills/my-skill # scaffold test.py
 ```
 
 ## Cost, and what CI can cover
 
 Every test is at least one live model call. Run the tests for the skill you
-changed, not the whole tree. skillrig's own CI covers parsing and the fake-binary
+changed, not the whole tree. skillcheck's own CI covers parsing and the fake-binary
 machinery against recorded CLI output; it cannot run real agents, so live
 behaviour is checked by hand. Agent CLIs change their flags without notice, and
 that is where breakage comes from.

@@ -1,6 +1,6 @@
 ---
-name: skillrig-tests
-description: Write, extend, or repair the test.py that skillrig runs beside a SKILL.md — a real coding agent against the skill in a throwaway workspace, asserted on what it actually did. Covers the RunResult assertion surface, replying with answers= to a skill that asks questions, faking a CLI with fake= so a test never touches real infrastructure, LLM rubrics through judge, harness selection, and results.json. Use when adding a test to a skill, when a skill test goes red and the assertion may be the thing at fault, or when asked how a skill gets tested.
+name: skillcheck-tests
+description: Write, extend, or repair the test.py that skillcheck runs beside a SKILL.md — a real coding agent against the skill in a throwaway workspace, asserted on what it actually did. Covers the RunResult assertion surface, replying with answers= to a skill that asks questions, faking a CLI with fake= so a test never touches real infrastructure, LLM rubrics through judge, harness selection, and results.json. Use when adding a test to a skill, when a skill test goes red and the assertion may be the thing at fault, or when asked how a skill gets tested.
 user-invocable: false
 allowed-tools:
   - Read
@@ -12,7 +12,7 @@ allowed-tools:
 ---
 
 <overview>
-skillrig is a pytest plugin that runs a real agent CLI against a skill and reports
+skillcheck is a pytest plugin that runs a real agent CLI against a skill and reports
 what happened. This skill covers writing that test: where the file goes, what to
 assert, how to keep a test away from anything real, and how to read a failure. It
 produces an executable `test.py` beside the `SKILL.md` it covers, and it stops
@@ -22,7 +22,7 @@ is the user's call.
 
 <variables>
 - `${CLAUDE_SKILL_DIR}`: Path to this skill's directory.
-- `SKILL_UNDER_TEST`: The directory holding the `SKILL.md` being tested. skillrig
+- `SKILL_UNDER_TEST`: The directory holding the `SKILL.md` being tested. skillcheck
   infers it from where the test file lives, so this decides everything.
 - `TEST_FILE`: `SKILL_UNDER_TEST/test.py`. Always that name, always that place.
 - `HARNESS`: Which agent CLI runs — `claude`, `codex`, or `opencode`. Unset means
@@ -32,7 +32,7 @@ is the user's call.
 <workflow>
 <step order="1">
 Find `SKILL_UNDER_TEST`: the nearest ancestor directory holding a `SKILL.md`.
-skillrig walks the same path from the test file, which is why `run_skill` needs no
+skillcheck walks the same path from the test file, which is why `run_skill` needs no
 `skill=` argument and no `conftest.py`. Done when you can name both
 `SKILL_UNDER_TEST` and `TEST_FILE` as absolute paths.
 </step>
@@ -47,18 +47,18 @@ in the workspace or the transcript afterwards.
 
 <step order="3">
 Write `TEST_FILE` in the canonical shape below, one test per observable. Done when
-the file carries the shebang, the `# /// script` block depending on `skillrig`,
-`from skillrig import main`, and the `main(__file__)` footer.
+the file carries the shebang, the `# /// script` block depending on `skillcheck`,
+`from skillcheck import main`, and the `main(__file__)` footer.
 
 ```python
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["skillrig"]
+# dependencies = ["pytest-skillcheck"]
 # ///
 """Tests for the <name> skill. Run it directly: ./.claude/skills/<name>/test.py"""
 
-from skillrig import main
+from skillcheck import main
 
 
 def test_does_the_thing_it_is_for(run_skill):
@@ -130,13 +130,13 @@ so re-run the one test first.
 | File | Contents | Read when |
 |------|----------|-----------|
 | `${CLAUDE_SKILL_DIR}/reference/assertions.md` | Every `RunResult` member with its exact semantics, `answers=`, `judge`, and the assertions that fail on correct behaviour | Writing or debugging any assertion |
-| `${CLAUDE_SKILL_DIR}/reference/fakes.md` | `fake=`, the `gh` fixture format, the four guards between a test and real infrastructure, adding a fake for a binary skillrig does not ship | The skill calls out to a service |
-| `${CLAUDE_SKILL_DIR}/reference/running.md` | Harnesses and isolation, `SKILLRIG_*` settings, `pytest` flags, the `skillrig` CLI, `results.json` | Choosing a harness, changing settings, or reading recorded results |
+| `${CLAUDE_SKILL_DIR}/reference/fakes.md` | `fake=`, the `gh` fixture format, the four guards between a test and real infrastructure, adding a fake for a binary skillcheck does not ship | The skill calls out to a service |
+| `${CLAUDE_SKILL_DIR}/reference/running.md` | Harnesses and isolation, `SKILLCHECK_*` settings, `pytest` flags, the `skillcheck` CLI, `results.json` | Choosing a harness, changing settings, or reading recorded results |
 </reference-files>
 
 <boundaries>
 <always>
-- Put the test at `SKILL_UNDER_TEST/test.py`, so skillrig infers the skill from its
+- Put the test at `SKILL_UNDER_TEST/test.py`, so skillcheck infers the skill from its
   location
 - Assert against what the skill's own boundaries promise
 - Keep the set small: three sharp tests beat ten vague ones, and each one is a

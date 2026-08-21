@@ -17,7 +17,7 @@ from pathlib import Path
 from .harnesses import FAKE_BIN, FAKE_STATE, Harness
 
 FAKES = Path(__file__).parent / "fakes"
-MARKER = "skillrig-fake"
+MARKER = "skillcheck-fake"
 
 # Nothing in the run should reach a real forge, so git URLs for the common hosts
 # rewrite to a path that does not exist. This file also replaces the user's global
@@ -25,35 +25,35 @@ MARKER = "skillrig-fake"
 # the agent starts improvising with the real user's name and email.
 GITCONFIG = """\
 [user]
-\tname = skillrig
-\temail = skillrig@example.invalid
+\tname = skillcheck
+\temail = skillcheck@example.invalid
 [init]
 \tdefaultBranch = main
 [safe]
 \tdirectory = *
-[url "/nonexistent/blocked-by-skillrig/"]
+[url "/nonexistent/blocked-by-skillcheck/"]
 \tinsteadOf = https://github.com/
-[url "/nonexistent/blocked-by-skillrig/"]
+[url "/nonexistent/blocked-by-skillcheck/"]
 \tinsteadOf = git@github.com:
-[url "/nonexistent/blocked-by-skillrig/"]
+[url "/nonexistent/blocked-by-skillcheck/"]
 \tinsteadOf = https://gitlab.com/
 """
 
 
 def available() -> list[str]:
-    """Which binaries skillrig ships a fake for."""
+    """Which binaries skillcheck ships a fake for."""
     return sorted(path.stem for path in FAKES.glob("*.py") if path.stem != "__init__")
 
 
 def install(workspace: Path, binary: str, fixture: dict, script: Path | None = None) -> None:
     """Put a fake `binary` first on PATH, backed by `fixture`.
 
-    `script` overrides the shipped fake, for a binary skillrig does not know.
+    `script` overrides the shipped fake, for a binary skillcheck does not know.
     """
     source = script or FAKES / f"{binary}.py"
     if not Path(source).is_file():
         raise FileNotFoundError(
-            f"no fake for {binary!r}; skillrig ships {available()}. "
+            f"no fake for {binary!r}; skillcheck ships {available()}. "
             "Pass script= with your own, or add one upstream."
         )
 
@@ -77,7 +77,7 @@ def verify(harness: Harness, workspace: Path, binary: str) -> None:
     import subprocess
 
     proc = subprocess.run(
-        [binary, "--skillrig-fake"],
+        [binary, "--skillcheck-fake"],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -85,7 +85,7 @@ def verify(harness: Harness, workspace: Path, binary: str) -> None:
     )
     if proc.returncode != 0 or MARKER not in proc.stdout:
         raise RuntimeError(
-            f"refusing to run: `{binary}` on PATH is not the skillrig fake "
+            f"refusing to run: `{binary}` on PATH is not the skillcheck fake "
             f"(exit {proc.returncode}, stdout {proc.stdout.strip()!r}). "
             "The real one would act on real infrastructure."
         )
@@ -94,17 +94,17 @@ def verify(harness: Harness, workspace: Path, binary: str) -> None:
 def verify_through_agent(harness: Harness, workspace: Path, binary: str, timeout: int) -> None:
     """Have the agent itself run the marker check in a throwaway session.
 
-    Checking skillrig's own subprocess environment proves nothing about the shell
+    Checking skillcheck's own subprocess environment proves nothing about the shell
     the agent runs tools in, which can rebuild PATH from a profile. This asks the
     model to run the command and report back, in a session that does nothing else.
     """
     probe = harness.run(
-        f"Run the command `{binary} --skillrig-fake` and reply with its output, nothing else.",
+        f"Run the command `{binary} --skillcheck-fake` and reply with its output, nothing else.",
         workspace,
         timeout,
     )
     if MARKER not in probe.output:
         raise RuntimeError(
             f"refusing to run: the agent's own shell did not resolve `{binary}` to the "
-            f"skillrig fake. It reported: {probe.output.strip()[:400]!r}"
+            f"skillcheck fake. It reported: {probe.output.strip()[:400]!r}"
         )

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Skillcheck Tests"
+  short_description: "Write and repair the skillcheck test.py that runs a real agent against a skill"

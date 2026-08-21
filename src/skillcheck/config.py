@@ -2,7 +2,7 @@
 
 Environment wins so a one-off run needs no file edit:
 
-    SKILLRIG_HARNESS=all ./skills/git-graveyard/test.py
+    SKILLCHECK_HARNESS=all ./skills/git-graveyard/test.py
 """
 
 import os
@@ -19,7 +19,7 @@ DEFAULT_JUDGE_MODEL = "sonnet"
 
 
 def _pyproject(start: Path) -> dict:
-    """`[tool.skillrig]` from the nearest pyproject.toml at or above `start`."""
+    """`[tool.skillcheck]` from the nearest pyproject.toml at or above `start`."""
     for directory in [start, *start.parents]:
         candidate = directory / "pyproject.toml"
         if candidate.is_file():
@@ -27,7 +27,7 @@ def _pyproject(start: Path) -> dict:
                 data = tomllib.loads(candidate.read_text())
             except tomllib.TOMLDecodeError:
                 return {}
-            return data.get("tool", {}).get("skillrig", {})
+            return data.get("tool", {}).get("skillcheck", {})
     return {}
 
 
@@ -58,7 +58,7 @@ class Config:
         table = _pyproject(root or Path.cwd())
         environment = os.environ
 
-        raw = environment.get("SKILLRIG_HARNESS") or table.get("harness")
+        raw = environment.get("SKILLCHECK_HARNESS") or table.get("harness")
         if raw in (None, "", "auto"):
             harnesses = installed()[:1] or list(HARNESS_ORDER[:1])
         elif raw == "all":
@@ -69,20 +69,22 @@ class Config:
             harnesses = [name.strip() for name in str(raw).split(",") if name.strip()]
 
         models = dict(table.get("models", {}))
-        if shared := environment.get("SKILLRIG_MODEL"):
+        if shared := environment.get("SKILLCHECK_MODEL"):
             models["*"] = shared
         for name in HARNESS_ORDER:
-            if specific := environment.get(f"SKILLRIG_MODEL_{name.upper()}"):
+            if specific := environment.get(f"SKILLCHECK_MODEL_{name.upper()}"):
                 models[name] = specific
 
         return cls(
             harnesses=harnesses,
             models=models,
-            judge=environment.get("SKILLRIG_JUDGE", table.get("judge", "claude")),
+            judge=environment.get("SKILLCHECK_JUDGE", table.get("judge", "claude")),
             judge_model=environment.get(
-                "SKILLRIG_JUDGE_MODEL", table.get("judge_model", DEFAULT_JUDGE_MODEL)
+                "SKILLCHECK_JUDGE_MODEL", table.get("judge_model", DEFAULT_JUDGE_MODEL)
             ),
-            timeout=int(environment.get("SKILLRIG_TIMEOUT", table.get("timeout", DEFAULT_TIMEOUT))),
-            results=environment.get("SKILLRIG_RESULTS", table.get("results")),
-            record=environment.get("SKILLRIG_RECORD", "1") not in ("0", "false", "no"),
+            timeout=int(
+                environment.get("SKILLCHECK_TIMEOUT", table.get("timeout", DEFAULT_TIMEOUT))
+            ),
+            results=environment.get("SKILLCHECK_RESULTS", table.get("results")),
+            record=environment.get("SKILLCHECK_RECORD", "1") not in ("0", "false", "no"),
         )

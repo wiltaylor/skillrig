@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "skillrig"
+name = "pytest-skillcheck"
 version = "0.1.2"
 description = "Test agent skills against real coding agents: run a prompt, assert on what happened, grade the rest with an LLM."
 readme = "README.md"
@@ -24,20 +24,20 @@ classifiers = [
 dependencies = ["pytest>=8"]
 
 [project.urls]
-Homepage = "https://github.com/wiltaylor/skillrig"
-Issues = "https://github.com/wiltaylor/skillrig/issues"
+Homepage = "https://github.com/wiltaylor/pytest-skillcheck"
+Issues = "https://github.com/wiltaylor/pytest-skillcheck/issues"
 
 [project.scripts]
-skillrig = "skillrig.cli:main_cli"
+skillcheck = "skillcheck.cli:main_cli"
 
 [project.entry-points.pytest11]
-skillrig = "skillrig.plugin"
+skillcheck = "skillcheck.plugin"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-subprocess>=1.5", "ruff>=0.6"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/skillrig"]
+packages = ["src/skillcheck"]
 
 [tool.ruff]
 line-length = 100

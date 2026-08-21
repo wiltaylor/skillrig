@@ -25,14 +25,14 @@ imagined. Include it in every test that uses a fake.
 
 ## The `gh` fixture
 
-skillrig ships one fake, for the GitHub CLI. Its fixture maps `owner/name` to
+skillcheck ships one fake, for the GitHub CLI. Its fixture maps `owner/name` to
 whatever fields the test wants answered:
 
 ```python
 fake={"gh": {"wiltaylor/deadproj": {"visibility": "PUBLIC", "contents": ["old-thing"]}}}
 ```
 
-The stub reads it from `SKILLRIG_FAKE_STATE`, appends every call to `calls.jsonl`
+The stub reads it from `SKILLCHECK_FAKE_STATE`, appends every call to `calls.jsonl`
 with a status of `ok`, `refused`, or `not-found`, and exits 64 on a refusal.
 
 ## Why nothing simpler works
@@ -44,10 +44,10 @@ earlier on `PATH`.
 Four things stand between a test and real infrastructure, and the run starts only
 once all of them hold:
 
-1. The stub goes first on `PATH`, and skillrig runs `<binary> --skillrig-fake`
+1. The stub goes first on `PATH`, and skillcheck runs `<binary> --skillcheck-fake`
    itself, checking for the marker.
 2. The agent then runs the same check in a throwaway session of its own. Checking
-   skillrig's environment proves nothing about the shell the agent's tools run in,
+   skillcheck's environment proves nothing about the shell the agent's tools run in,
    which can rebuild `PATH` from a profile.
 3. `GIT_CONFIG_GLOBAL` is replaced for the run. It rewrites every github.com and
    gitlab.com URL to a path that does not exist, so git cannot reach a forge
@@ -65,18 +65,18 @@ for an output tree — and have the skill read those locations from config rathe
 than hardcoding them. A skill that hardcodes a real destination cannot be tested
 without changing the skill.
 
-## A binary skillrig does not ship a fake for
+## A binary skillcheck does not ship a fake for
 
 Write a stub and pass it explicitly:
 
 ```python
-from skillrig import fakebin
+from skillcheck import fakebin
 
 fakebin.install(workspace, "aws", fixture, script=Path("fakes/aws.py"))
 ```
 
-Model it on `src/skillrig/fakes/gh.py`: answer `--skillrig-fake` with the marker
-`skillrig-fake`, read the fixture from `SKILLRIG_FAKE_STATE/<binary>/fixture.json`,
+Model it on `src/skillcheck/fakes/gh.py`: answer `--skillcheck-fake` with the marker
+`skillcheck-fake`, read the fixture from `SKILLCHECK_FAKE_STATE/<binary>/fixture.json`,
 append `{"argv": [...], "status": "..."}` to `calls.jsonl` on every invocation, and
 exit non-zero on anything unrecognised. Better still, add it upstream so every
 skill gets it.

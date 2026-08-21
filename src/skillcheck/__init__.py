@@ -3,9 +3,9 @@
     # skills/my-skill/test.py
     #!/usr/bin/env -S uv run --script
     # /// script
-    # dependencies = ["skillrig"]
+    # dependencies = ["pytest-skillcheck"]
     # ///
-    from skillrig import main
+    from skillcheck import main
 
     def test_it_works(run_skill):
         result = run_skill("Do the thing")

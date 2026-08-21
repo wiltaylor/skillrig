@@ -1,6 +1,6 @@
 """The pytest plugin: fixtures, options, and result recording.
 
-Installing skillrig is enough — there is no conftest.py to copy. A test file
+Installing skillcheck is enough — there is no conftest.py to copy. A test file
 living inside a skill directory knows which skill it tests, so `run_skill` needs
 no skill= argument.
 """
@@ -19,7 +19,7 @@ from .judge import judge as run_judge
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup("skillrig")
+    group = parser.getgroup("skillcheck")
     group.addoption(
         "--harness",
         default=None,
@@ -50,25 +50,25 @@ def pytest_configure(config):
     # module basename collision the moment a second skill is collected.
     if config.getoption("importmode") == "prepend":
         config.option.importmode = "importlib"
-    config.skillrig = Config.load(Path(config.rootpath))
+    config.skillcheck = Config.load(Path(config.rootpath))
     if selected := config.getoption("--harness"):
-        config.skillrig.harnesses = (
+        config.skillcheck.harnesses = (
             list(HARNESSES) if selected == "all" else [n.strip() for n in selected.split(",")]
         )
     if model := config.getoption("--skill-model"):
-        config.skillrig.models["*"] = model
+        config.skillcheck.models["*"] = model
     if timeout := config.getoption("--skill-timeout"):
-        config.skillrig.timeout = timeout
+        config.skillcheck.timeout = timeout
     if config.getoption("--no-record"):
-        config.skillrig.record = False
+        config.skillcheck.record = False
 
-    config.skillrig_records = {}
-    config.skillrig_setup_time = {}
+    config.skillcheck_records = {}
+    config.skillcheck_setup_time = {}
 
 
 def pytest_generate_tests(metafunc):
     if "harness" in metafunc.fixturenames:
-        names = metafunc.config.skillrig.harnesses
+        names = metafunc.config.skillcheck.harnesses
         for name in names:
             if name not in HARNESSES:
                 raise pytest.UsageError(f"unknown harness {name!r}; pick from {sorted(HARNESSES)}")
@@ -89,7 +89,7 @@ def skill_dir(request) -> Path:
     found = skill_dir_for(Path(request.node.fspath))
     if found is None:
         pytest.fail(
-            "this test is not inside a skill directory, so skillrig cannot tell which "
+            "this test is not inside a skill directory, so skillcheck cannot tell which "
             "skill it covers. Move it next to a SKILL.md, or pass skill= explicitly."
         )
     return found
@@ -99,7 +99,7 @@ def skill_dir(request) -> Path:
 def harness(request):
     """The agent CLI under test, parametrized from configuration."""
     name = request.param
-    agent = get_harness(name, model=request.config.skillrig.model_for(name))
+    agent = get_harness(name, model=request.config.skillcheck.model_for(name))
     if not agent.available():
         pytest.skip(f"{name} CLI is not installed")
     marker = request.node.get_closest_marker("harness")
@@ -141,7 +141,7 @@ def run_agent(harness, workspace, request):
         fake: dict[str, dict] | None = None,
         timeout: int | None = None,
     ) -> RunResult:
-        limit = timeout or request.config.skillrig.timeout
+        limit = timeout or request.config.skillcheck.timeout
 
         for binary, fixture in (fake or {}).items():
             fakebin.install(workspace, binary, fixture)
@@ -159,7 +159,7 @@ def run_agent(harness, workspace, request):
             target.write_text(content)
 
         result = harness.run(prompt, workspace, limit, answers=answers)
-        record = request.config.skillrig_records.setdefault(request.node.nodeid, {})
+        record = request.config.skillcheck_records.setdefault(request.node.nodeid, {})
         record.update(harness=harness.name, model=result.model)
         return result
 
@@ -175,7 +175,7 @@ def run_skill(run_agent):
 @pytest.fixture
 def judge(request):
     """Grade a run against a rubric with a model."""
-    settings = request.config.skillrig
+    settings = request.config.skillcheck
 
     def grade(rubric: str, context: str | RunResult) -> Verdict:
         if isinstance(context, RunResult):
@@ -188,7 +188,7 @@ def judge(request):
             timeout=settings.timeout,
         )
         print(f"\njudge: {verdict}")
-        record = request.config.skillrig_records.setdefault(request.node.nodeid, {})
+        record = request.config.skillcheck_records.setdefault(request.node.nodeid, {})
         record["judge"] = {"passed": verdict.passed, "score": verdict.score}
         return verdict
 
@@ -203,19 +203,19 @@ def pytest_runtest_makereport(item, call):
     config = item.config
 
     if report.outcome == "skipped":
-        config.skillrig_records.setdefault(report.nodeid, {}).update(
+        config.skillcheck_records.setdefault(report.nodeid, {}).update(
             outcome="skipped", ran_at=results.now()
         )
         return
     if report.when == "setup":
         # Tests that run the agent from a fixture spend their time here.
-        config.skillrig_setup_time[report.nodeid] = report.duration
+        config.skillcheck_setup_time[report.nodeid] = report.duration
         return
     if report.when != "call":
         return
 
-    setup = config.skillrig_setup_time.pop(report.nodeid, 0)
-    config.skillrig_records.setdefault(report.nodeid, {}).update(
+    setup = config.skillcheck_setup_time.pop(report.nodeid, 0)
+    config.skillcheck_records.setdefault(report.nodeid, {}).update(
         outcome=report.outcome,
         ran_at=results.now(),
         duration_s=round(setup + report.duration, 1),
@@ -226,11 +226,11 @@ def pytest_runtest_makereport(item, call):
 def pytest_sessionfinish(session):
     """Write each test's record beside the test file that produced it."""
     config = session.config
-    if not config.skillrig.record or config.getoption("--collect-only"):
+    if not config.skillcheck.record or config.getoption("--collect-only"):
         return
 
     by_file: dict[Path, dict[str, dict]] = {}
-    for nodeid, record in config.skillrig_records.items():
+    for nodeid, record in config.skillcheck_records.items():
         source = record.pop("file", None) or nodeid.split("::")[0]
         by_file.setdefault(Path(source), {})[nodeid.split("::", 1)[-1]] = record
 
@@ -238,7 +238,7 @@ def pytest_sessionfinish(session):
         skill = skill_dir_for(source)
         if skill is None:
             # A results file describes a skill. Tests that sit outside one -- a
-            # project's own suite, with skillrig merely installed -- have nothing
+            # project's own suite, with skillcheck merely installed -- have nothing
             # to describe, so they leave nothing behind.
             continue
-        results.merge(results.path_for(source, config.skillrig.results), skill.name, records)
+        results.merge(results.path_for(source, config.skillcheck.results), skill.name, records)

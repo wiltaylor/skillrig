@@ -1,3 +1,0 @@
-interface:
-  display_name: "Skillrig Tests"
-  short_description: "Write and repair the skillrig test.py that runs a real agent against a skill"

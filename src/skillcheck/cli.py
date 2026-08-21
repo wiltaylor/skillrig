@@ -1,4 +1,4 @@
-"""`skillrig` on the command line, and `main()` for a standalone test file."""
+"""`skillcheck` on the command line, and `main()` for a standalone test file."""
 
 import argparse
 import shutil
@@ -14,11 +14,11 @@ from .harnesses import HARNESSES
 TEMPLATE = '''#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["skillrig"]
+# dependencies = ["pytest-skillcheck"]
 # ///
 """Tests for the {name} skill. Run it directly: ./{path}"""
 
-from skillrig import main
+from skillcheck import main
 
 
 def test_{slug}_does_its_job(run_skill):
@@ -100,7 +100,7 @@ def cmd_new(args) -> int:
 
 
 def main_cli(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="skillrig", description=__doc__)
+    parser = argparse.ArgumentParser(prog="skillcheck", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     test = sub.add_parser("test", help="run skill tests")

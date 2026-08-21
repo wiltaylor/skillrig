@@ -25,8 +25,8 @@ imagined. Include it in every test that uses a fake.
 
 ## The `gh` fixture
 
-skillcheck ships one fake, for the GitHub CLI. Its fixture maps `owner/name` to
-whatever fields the test wants answered:
+skillcheck ships a purpose-built fake for the GitHub CLI. Its fixture maps
+`owner/name` to whatever fields the test wants answered:
 
 ```python
 fake={"gh": {"wiltaylor/deadproj": {"visibility": "PUBLIC", "contents": ["old-thing"]}}}
@@ -34,6 +34,42 @@ fake={"gh": {"wiltaylor/deadproj": {"visibility": "PUBLIC", "contents": ["old-th
 
 The stub reads it from `SKILLCHECK_FAKE_STATE`, appends every call to `calls.jsonl`
 with a status of `ok`, `refused`, or `not-found`, and exits 64 on a refusal.
+
+## The `curl` fixture
+
+Keyed by URL pattern rather than by command. It honours `-o FILE`,
+`-w '%{http_code}'`, and `-f`, and it does not mistake a header or a `-d` body for
+the URL.
+
+```python
+fake={"curl": {
+    "https://api.example.com/repos/.*": {"body": '{"name": "proj"}', "status": 200},
+    "https://example.com/missing": {"status": 404, "body": "not found"},
+}}
+```
+
+## Any other binary
+
+Describe the commands and skillcheck supplies the stub — no Python file. Patterns
+are regular expressions anchored at the start, matched against the arguments as
+one string, tried in the order written.
+
+```python
+fake={
+    "kubectl": {
+        "get pods": "NAME   READY\nweb-0  1/1",
+        "apply -f .*": {"stdout": "deployment configured", "exit": 0},
+        "delete .*": {"stderr": "forbidden", "exit": 1},
+    },
+    "terraform": {"commands": {"apply": ["in progress", "in progress", "complete"]}},
+}
+```
+
+A response is a string (its stdout), an object with `stdout`, `stderr`, `exit`,
+and `writes` (paths to write, relative to the workspace), or a list — each call
+taking the next entry, the last repeating. Wrap the map in `commands` to use this
+engine for a binary that has a purpose-built fake, or to keep other settings
+beside it. Anything the fixture does not describe is refused, exit 64.
 
 ## Why nothing simpler works
 
@@ -65,9 +101,11 @@ for an output tree — and have the skill read those locations from config rathe
 than hardcoding them. A skill that hardcodes a real destination cannot be tested
 without changing the skill.
 
-## A binary skillcheck does not ship a fake for
+## A stub of your own
 
-Write a stub and pass it explicitly:
+Reach for this only when the command needs behaviour the fixture cannot describe —
+state that changes across calls in a way a list cannot express, or output computed
+from the arguments.
 
 ```python
 from skillcheck import fakebin

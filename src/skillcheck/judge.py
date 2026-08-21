@@ -37,6 +37,35 @@ Report the verdict with structured output.
 """
 
 
+COMPARE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "winner": {"type": "string", "enum": ["a", "b", "tie"]},
+        "reasoning": {"type": "string"},
+    },
+    "required": ["winner", "reasoning"],
+}
+
+COMPARE_TEMPLATE = """You are comparing two runs of a coding agent, A and B,
+against a rubric. They differ in the instructions the agent was given.
+
+<rubric>
+{rubric}
+</rubric>
+
+<run_a>
+{a}
+</run_a>
+
+<run_b>
+{b}
+</run_b>
+
+Say which run better satisfies the rubric, or "tie" when neither is better.
+Judge only against the rubric. Report the verdict with structured output.
+"""
+
+
 @dataclass
 class Verdict:
     passed: bool
@@ -50,7 +79,18 @@ class Verdict:
         return f"[{'pass' if self.passed else 'FAIL'} {self.score}/5] {self.reasoning}"
 
 
-def _claude_cli(prompt: str, model: str, timeout: int) -> dict:
+@dataclass
+class Comparison:
+    """Which of two runs better met a rubric."""
+
+    winner: str
+    reasoning: str
+
+    def __str__(self) -> str:
+        return f"[{self.winner}] {self.reasoning}"
+
+
+def _claude_cli(prompt: str, model: str, timeout: int, schema: dict = SCHEMA) -> dict:
     proc = subprocess.run(
         [
             "claude",
@@ -64,7 +104,7 @@ def _claude_cli(prompt: str, model: str, timeout: int) -> dict:
             "StructuredOutput",
             "--no-session-persistence",
             "--json-schema",
-            json.dumps(SCHEMA),
+            json.dumps(schema),
         ],
         capture_output=True,
         text=True,
@@ -80,7 +120,7 @@ def _claude_cli(prompt: str, model: str, timeout: int) -> dict:
     return verdict
 
 
-def _anthropic_api(prompt: str, model: str, timeout: int) -> dict:
+def _anthropic_api(prompt: str, model: str, timeout: int, schema: dict = SCHEMA) -> dict:
     try:
         import anthropic
     except ImportError as error:  # pragma: no cover - depends on the user's environment
@@ -97,7 +137,7 @@ def _anthropic_api(prompt: str, model: str, timeout: int) -> dict:
             {
                 "name": "verdict",
                 "description": "Report the grading verdict.",
-                "input_schema": SCHEMA,
+                "input_schema": schema,
             }
         ],
         tool_choice={"type": "tool", "name": "verdict"},
@@ -108,23 +148,90 @@ def _anthropic_api(prompt: str, model: str, timeout: int) -> dict:
     raise RuntimeError("judge returned no verdict")
 
 
-BACKENDS: dict[str, Callable[[str, str, int], dict]] = {
+def _claude_text(prompt: str, model: str, timeout: int) -> str:
+    proc = subprocess.run(
+        ["claude", "-p", prompt, "--model", model, "--no-session-persistence"],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"model call failed ({proc.returncode}): {proc.stderr[-2000:]}")
+    return proc.stdout.strip()
+
+
+def _anthropic_text(prompt: str, model: str, timeout: int) -> str:
+    try:
+        import anthropic
+    except ImportError as error:  # pragma: no cover - depends on the user's environment
+        raise RuntimeError("this backend needs the anthropic package") from error
+
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=timeout)
+    message = client.messages.create(
+        model=model, max_tokens=1024, messages=[{"role": "user", "content": prompt}]
+    )
+    return "".join(block.text for block in message.content if block.type == "text").strip()
+
+
+BACKENDS: dict[str, Callable[..., dict]] = {
     "claude": _claude_cli,
     "anthropic": _anthropic_api,
 }
+
+TEXT_BACKENDS: dict[str, Callable[[str, str, int], str]] = {
+    "claude": _claude_text,
+    "anthropic": _anthropic_text,
+}
+
+
+def _resolve(backend, table: dict):
+    if not isinstance(backend, str):
+        return backend
+    if backend not in table:
+        raise KeyError(f"unknown judge backend {backend!r}; pick from {sorted(table)}")
+    return table[backend]
 
 
 def judge(
     rubric: str,
     context: str,
-    backend: str | Callable[[str, str, int], dict] = "claude",
+    backend: str | Callable[..., dict] = "claude",
     model: str = "sonnet",
     timeout: int = 300,
 ) -> Verdict:
     """Grade `context` against `rubric` and return the verdict."""
-    call = BACKENDS[backend] if isinstance(backend, str) else backend
-    if isinstance(backend, str) and backend not in BACKENDS:
-        raise KeyError(f"unknown judge backend {backend!r}; pick from {sorted(BACKENDS)}")
-
+    call = _resolve(backend, BACKENDS)
     verdict = call(TEMPLATE.format(rubric=rubric.strip(), context=context.strip()), model, timeout)
     return Verdict(verdict["passed"], verdict["score"], verdict["reasoning"])
+
+
+def compare(
+    rubric: str,
+    a: str,
+    b: str,
+    backend: str | Callable[..., dict] = "claude",
+    model: str = "sonnet",
+    timeout: int = 300,
+) -> Comparison:
+    """Say which of two runs better meets `rubric`.
+
+    For the edit-the-wording loop: run the same prompt against two versions of a
+    skill and ask which version got the better behaviour out of the agent.
+    """
+    call = _resolve(backend, BACKENDS)
+    prompt = COMPARE_TEMPLATE.format(rubric=rubric.strip(), a=a.strip(), b=b.strip())
+    try:
+        verdict = call(prompt, model, timeout, COMPARE_SCHEMA)
+    except TypeError:  # a custom backend that takes only the three arguments
+        verdict = call(prompt, model, timeout)
+    return Comparison(verdict["winner"], verdict["reasoning"])
+
+
+def ask(
+    prompt: str,
+    backend: str | Callable[[str, str, int], str] = "claude",
+    model: str = "sonnet",
+    timeout: int = 300,
+) -> str:
+    """One plain-text model call. What a simulated user is built on."""
+    return _resolve(backend, TEXT_BACKENDS)(prompt, model, timeout)

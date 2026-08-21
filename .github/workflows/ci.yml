@@ -21,7 +21,9 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
         continue-on-error: true
-      # These cover parsing, turn merging, and the fakes against recorded CLI
-      # output. Tests that drive a real agent cost money and need credentials, so
-      # they are run by hand rather than here.
+      # These cover parsing, turn merging, the assertion surface, the fakes, and
+      # the plugin end to end against a stub CLI. Tests that drive a real agent
+      # cost money and need credentials, so they are run by hand rather than here.
       - run: uv run pytest tests -q
+      # The linter on skillcheck's own skills: no model, no credentials.
+      - run: uv run skillcheck lint .claude/skills

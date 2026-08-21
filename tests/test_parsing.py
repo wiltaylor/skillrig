@@ -9,6 +9,7 @@ import json
 from skillcheck.harnesses import (
     ClaudeHarness,
     CodexHarness,
+    DroidHarness,
     OpencodeHarness,
     asks_question,
     merge_turns,
@@ -65,6 +66,46 @@ OPENCODE = "\n".join(
 )
 
 
+# Recorded from `droid exec -o stream-json`, trimmed to the fields skillcheck reads.
+DROID = "\n".join(
+    json.dumps(event)
+    for event in [
+        {
+            "type": "system",
+            "subtype": "init",
+            "session_id": "14bc6628-ede2",
+            "model": "claude-opus-5",
+        },
+        {"type": "message", "role": "user", "text": "Use the hello-marker skill."},
+        {
+            "type": "tool_call",
+            "toolId": "Skill",
+            "toolName": "Skill",
+            "parameters": {"skill": "hello-marker"},
+        },
+        {
+            "type": "tool_call",
+            "toolId": "Execute",
+            "toolName": "Execute",
+            "parameters": {"command": "echo hello", "summary": "Echo"},
+        },
+        {"type": "message", "role": "assistant", "text": "The skill ran."},
+        {
+            "type": "completion",
+            "finalText": "The skill ran.",
+            "numTurns": 4,
+            "usage": {
+                "input_tokens": 8,
+                "output_tokens": 411,
+                "cache_read_input_tokens": 56434,
+                "cache_creation_input_tokens": 7166,
+                "factory_credits": 33329,
+            },
+        },
+    ]
+)
+
+
 def test_claude_parses_output_tools_and_session():
     harness = ClaudeHarness()
     output, tools, events = harness.parse(CLAUDE)
@@ -91,6 +132,67 @@ def test_opencode_parses_text_and_task_calls():
     assert output == "ZEBRA-4417"
     assert tools[0].input["subagent_type"] == "zebra-keeper"
     assert harness.session_id(events) == "ses_123"
+
+
+def test_droid_parses_its_final_text_tool_calls_and_session():
+    harness = DroidHarness()
+    output, tools, events = harness.parse(DROID)
+
+    assert output == "The skill ran."
+    assert [use.name for use in tools] == ["Skill", "Execute"]
+    assert tools[1].input["command"] == "echo hello"
+    assert harness.session_id(events) == "14bc6628-ede2"
+    assert harness.detect_model(events) == "claude-opus-5"
+
+
+def test_droid_resume_keeps_the_prompt_last_where_the_cli_expects_it(tmp_path):
+    command = DroidHarness().resume_command("carry on", tmp_path, "session-1")
+
+    assert command[-3:] == ["-s", "session-1", "carry on"]
+    assert "--cwd" in command
+
+
+def test_each_harness_reports_what_the_turn_cost():
+    cost, read, written = ClaudeHarness().usage(
+        [
+            {
+                "type": "result",
+                "total_cost_usd": 0.084,
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 340,
+                    "cache_read_input_tokens": 20000,
+                },
+            }
+        ]
+    )
+    assert cost == 0.084 and read == 20012 and written == 340
+
+    cost, read, written = CodexHarness().usage(
+        [{"type": "turn.completed", "usage": {"input_tokens": 900, "output_tokens": 40}}]
+    )
+    assert cost is None and read == 900 and written == 40
+
+    cost, read, written = DroidHarness().usage(json.loads(f"[{','.join(DROID.splitlines())}]"))
+    assert cost is None and read == 8 + 56434 + 7166 and written == 411
+
+
+def test_opencode_counts_a_message_once_however_often_it_is_streamed():
+    events = [
+        {"part": {"messageID": "m1", "tokens": {"input": 10, "output": 2}, "cost": 0.01}},
+        {"part": {"messageID": "m1", "tokens": {"input": 10, "output": 5}, "cost": 0.02}},
+        {"part": {"messageID": "m2", "tokens": {"input": 3, "output": 1}, "cost": 0.03}},
+    ]
+
+    cost, read, written = OpencodeHarness().usage(events)
+
+    assert (read, written) == (13, 6)
+    assert cost == 0.05
+
+
+def test_a_harness_with_no_usage_in_its_output_reports_nothing_rather_than_zero_cost():
+    assert ClaudeHarness().usage([]) == (None, 0, 0)
+    assert OpencodeHarness().usage([{"part": {"type": "text", "text": "hi"}}]) == (None, 0, 0)
 
 
 def test_a_run_that_says_nothing_parses_to_empty_rather_than_crashing():

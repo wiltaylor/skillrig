@@ -40,22 +40,37 @@ GITCONFIG = """\
 """
 
 
+GENERIC = FAKES / "_generic.py"
+
+
 def available() -> list[str]:
-    """Which binaries skillcheck ships a fake for."""
-    return sorted(path.stem for path in FAKES.glob("*.py") if path.stem != "__init__")
+    """Which binaries skillcheck ships a purpose-built fake for."""
+    return sorted(path.stem for path in FAKES.glob("*.py") if not path.stem.startswith(("_", "__")))
+
+
+def source_for(binary: str, fixture: dict, script: Path | None = None) -> Path:
+    """Which stub answers for this binary.
+
+    A purpose-built fake if one ships for the command, otherwise the generic one
+    driven by the fixture. `commands` in the fixture asks for the generic engine
+    even where a purpose-built fake exists.
+    """
+    if script:
+        return Path(script)
+    if isinstance(fixture, dict) and "commands" in fixture:
+        return GENERIC
+    shipped = FAKES / f"{binary}.py"
+    return shipped if shipped.is_file() else GENERIC
 
 
 def install(workspace: Path, binary: str, fixture: dict, script: Path | None = None) -> None:
     """Put a fake `binary` first on PATH, backed by `fixture`.
 
-    `script` overrides the shipped fake, for a binary skillcheck does not know.
+    `script` overrides the choice of stub, for a fake of your own.
     """
-    source = script or FAKES / f"{binary}.py"
+    source = source_for(binary, fixture, script)
     if not Path(source).is_file():
-        raise FileNotFoundError(
-            f"no fake for {binary!r}; skillcheck ships {available()}. "
-            "Pass script= with your own, or add one upstream."
-        )
+        raise FileNotFoundError(f"no such fake script: {source}")
 
     bin_dir = workspace / FAKE_BIN
     bin_dir.mkdir(parents=True, exist_ok=True)

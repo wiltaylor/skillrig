@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # Tried in order; the first CLI actually installed is the default.
-HARNESS_ORDER = ("claude", "codex", "opencode")
+HARNESS_ORDER = ("claude", "codex", "opencode", "droid")
 
 DEFAULT_TIMEOUT = 900
 DEFAULT_JUDGE_MODEL = "sonnet"
@@ -49,6 +49,11 @@ class Config:
     timeout: int = DEFAULT_TIMEOUT
     results: str | None = None
     record: bool = True
+    # Recorded runs: off, auto, record, or replay. See cassette.py.
+    replay: str = "off"
+    cassettes: str | None = None
+    # An image name runs every agent CLI inside a container.
+    container: str | None = None
 
     def model_for(self, harness: str) -> str | None:
         return self.models.get(harness) or self.models.get("*")
@@ -87,4 +92,7 @@ class Config:
             ),
             results=environment.get("SKILLCHECK_RESULTS", table.get("results")),
             record=environment.get("SKILLCHECK_RECORD", "1") not in ("0", "false", "no"),
+            replay=environment.get("SKILLCHECK_REPLAY", table.get("replay", "off")),
+            cassettes=environment.get("SKILLCHECK_CASSETTES", table.get("cassettes")),
+            container=environment.get("SKILLCHECK_CONTAINER", table.get("container")),
         )

@@ -112,6 +112,13 @@ def test_git_is_blocked_from_reaching_a_real_forge(workspace):
     assert identity.stdout.strip().endswith("example.invalid")
 
 
-def test_asking_for_a_fake_that_does_not_exist_says_what_ships(workspace):
-    with pytest.raises(FileNotFoundError, match="skillcheck ships"):
-        fakebin.install(workspace, "kubectl", {})
+def test_a_binary_with_no_shipped_fake_gets_the_generic_engine(workspace):
+    assert fakebin.source_for("kubectl", {}) == fakebin.GENERIC
+    assert fakebin.source_for("gh", {}).name == "gh.py"
+    # `commands` asks for the generic engine even where a purpose-built fake ships.
+    assert fakebin.source_for("gh", {"commands": {}}) == fakebin.GENERIC
+
+
+def test_a_fake_script_that_does_not_exist_is_reported(workspace):
+    with pytest.raises(FileNotFoundError, match="no such fake script"):
+        fakebin.install(workspace, "kubectl", {}, script=workspace / "nope.py")

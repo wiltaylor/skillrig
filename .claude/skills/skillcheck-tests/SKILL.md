@@ -1,6 +1,6 @@
 ---
 name: skillcheck-tests
-description: Write, extend, or repair the test.py that skillcheck runs beside a SKILL.md — a real coding agent against the skill in a throwaway workspace, asserted on what it actually did. Covers the RunResult assertion surface, replying with answers= to a skill that asks questions, faking a CLI with fake= so a test never touches real infrastructure, LLM rubrics through judge, harness selection, and results.json. Use when adding a test to a skill, when a skill test goes red and the assertion may be the thing at fault, or when asked how a skill gets tested.
+description: Write, extend, or repair the test.py that skillcheck runs beside a SKILL.md — a real coding agent against the skill in a throwaway workspace, asserted on what it actually did. Covers the RunResult assertion surface, the workspace diff, answering a skill's questions with a list, a pattern map, or a simulated user, faking any CLI with fake= so a test never touches real infrastructure, LLM rubrics through judge, trigger tests, sampling, model-free linting, recorded runs, harness selection, and results.json. Use when adding a test to a skill, when a skill test goes red and the assertion may be the thing at fault, or when asked how a skill gets tested.
 user-invocable: false
 allowed-tools:
   - Read
@@ -25,8 +25,8 @@ is the user's call.
 - `SKILL_UNDER_TEST`: The directory holding the `SKILL.md` being tested. skillcheck
   infers it from where the test file lives, so this decides everything.
 - `TEST_FILE`: `SKILL_UNDER_TEST/test.py`. Always that name, always that place.
-- `HARNESS`: Which agent CLI runs — `claude`, `codex`, or `opencode`. Unset means
-  the first one installed.
+- `HARNESS`: Which agent CLI runs — `claude`, `codex`, `opencode`, or `droid`.
+  Unset means the first one installed.
 </variables>
 
 <workflow>
@@ -72,27 +72,36 @@ if __name__ == "__main__":
     raise SystemExit(main(__file__))
 ```
 
-`run_skill(prompt, skill=, agent=, files=, answers=, fake=, timeout=)` installs the
-skill into a fresh git repo, seeds `files=`, and runs the prompt. Its fixtures come
-from the installed plugin: `run_skill`, `run_agent`, `judge`, `skill_dir`,
-`workspace`, `harness`.
+`run_skill(prompt, skill=, agent=, files=, answers=, user=, fake=, timeout=,
+samples=, max_turns=)` installs the skill into a fresh git repo, seeds `files=`,
+and runs the prompt. It returns a `RunResult`, or a `RunSet` when `samples > 1`.
+Fixtures come from the installed plugin: `run_skill`, `run_agent`, `judge`,
+`skill_dir`, `workspace`, `harness`.
 </step>
 
 <step order="4">
-Choose the assertions from `${CLAUDE_SKILL_DIR}/reference/assertions.md`. Prefer an
-exact assertion over a rubric wherever one exists: where the file landed is exact,
-whether the explanation was clear is not. Done when every rubric in the file covers
-something no assertion could reach.
+Before anything live, run `skillcheck lint <SKILL_UNDER_TEST>`. It costs nothing,
+and a front-matter or link error explains a failure no live test would diagnose.
+Done when it exits 0, or when you have told the user which findings you left.
 </step>
 
 <step order="5">
+Choose the assertions from `${CLAUDE_SKILL_DIR}/reference/assertions.md`. Prefer an
+exact assertion over a rubric wherever one exists: where the file landed is exact,
+whether the explanation was clear is not. Reach for the diff — `created`,
+`modified`, `untouched` — over `files()`, since it says what the run *changed*
+rather than what happens to be there. Done when every rubric in the file covers
+something no assertion could reach.
+</step>
+
+<step order="6">
 Where the skill shells out to a service — `gh`, a cloud CLI, anything that acts on
 something real — give it a fake per `${CLAUDE_SKILL_DIR}/reference/fakes.md` before
 writing the first assertion. Done when no path through the test can reach real
 infrastructure, and the test asserts `not result.refusals("<binary>")`.
 </step>
 
-<step order="6">
+<step order="7">
 Write prompts and `answers` as the laziest plausible user would send them,
 ambiguity included. Ambiguity is the condition a boundary exists for, so a prompt
 that spells out the procedure measures the model's obedience rather than the
@@ -104,7 +113,7 @@ answers=["Looks right. Write it up."]                      # proves the skill
 ```
 </step>
 
-<step order="7">
+<step order="8">
 Make it executable, then hand the command to the user rather than running it:
 
 ```sh
@@ -129,9 +138,9 @@ so re-run the one test first.
 <reference-files>
 | File | Contents | Read when |
 |------|----------|-----------|
-| `${CLAUDE_SKILL_DIR}/reference/assertions.md` | Every `RunResult` member with its exact semantics, `answers=`, `judge`, and the assertions that fail on correct behaviour | Writing or debugging any assertion |
-| `${CLAUDE_SKILL_DIR}/reference/fakes.md` | `fake=`, the `gh` fixture format, the four guards between a test and real infrastructure, adding a fake for a binary skillcheck does not ship | The skill calls out to a service |
-| `${CLAUDE_SKILL_DIR}/reference/running.md` | Harnesses and isolation, `SKILLCHECK_*` settings, `pytest` flags, the `skillcheck` CLI, `results.json` | Choosing a harness, changing settings, or reading recorded results |
+| `${CLAUDE_SKILL_DIR}/reference/assertions.md` | Every `RunResult` member with its exact semantics, the three forms of `answers=`, trigger tests, `samples=`, `judge`, and the assertions that fail on correct behaviour | Writing or debugging any assertion |
+| `${CLAUDE_SKILL_DIR}/reference/fakes.md` | `fake=`, the `gh` and `curl` fixtures, describing any other binary, the four guards between a test and real infrastructure | The skill calls out to a service |
+| `${CLAUDE_SKILL_DIR}/reference/running.md` | Harnesses and isolation, `SKILLCHECK_*` settings, `pytest` flags, the `skillcheck` CLI, recorded runs, `results.json` | Choosing a harness, changing settings, replaying, or reading recorded results |
 </reference-files>
 
 <boundaries>
@@ -143,7 +152,9 @@ so re-run the one test first.
   live model call
 - Give a skill that reaches real infrastructure a fake and somewhere harmless to
   work before writing any other part of the test
-- Read the captured output in a failure before changing the skill
+- Read the captured output in a failure before changing the skill — skillcheck
+  attaches the transcript, the files that changed, and any refused fake call
+- Run `skillcheck lint` on the skill before writing live tests for it
 </always>
 
 <ask>
@@ -158,7 +169,9 @@ so re-run the one test first.
 - Write a prompt or an `answers` entry that restates the rule under test
 - Use `acted_before_asking` for a path the skill is supposed to read: it matches
   tool input, so a read-only `Read` matches as readily as a `Write`
-- Assert `not result.files()` in a test that seeds `files=`, which lists those too
+- Assert `not result.files()` in a test that seeds `files=`, which lists those
+  too — use `result.untouched()`, which is measured against the seeded state
+- Reach for `samples=` or `user=` by default: both multiply what a test costs
 - Let a test reach GitHub, a cloud account, or the user's home directory
 </never>
 </boundaries>

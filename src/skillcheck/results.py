@@ -103,6 +103,53 @@ def summarise(rows: list[dict]) -> tuple[list[str], list[list[str]]]:
     return harnesses, table
 
 
+def report(rows: list[dict]) -> str:
+    """Pass rate, time, and cost per skill and harness.
+
+    `status` answers "is it green". This answers "what is it costing, and how
+    often does it really pass", which is what decides whether a suite can run in
+    CI at all.
+    """
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for row in rows:
+        groups.setdefault((row["skill"], row.get("harness", "?")), []).append(row)
+
+    table = []
+    for (skill, harness), group in sorted(groups.items()):
+        outcomes = [row.get("outcome") for row in group]
+        ran = [outcome for outcome in outcomes if outcome in ("passed", "failed")]
+        passed = outcomes.count("passed")
+        rate = f"{passed / len(ran) * 100:.0f}%" if ran else "-"
+        cost = sum(row.get("cost_usd", 0) or 0 for row in group)
+        tokens = sum(row.get("tokens", 0) or 0 for row in group)
+        stamps = [row.get("ran_at") for row in group if row.get("ran_at")]
+        table.append(
+            [
+                skill,
+                harness,
+                str(len(group)),
+                f"{passed}/{len(ran)}" if ran else "0/0",
+                rate,
+                f"{sum(row.get('duration_s', 0) for row in group):.0f}s",
+                f"${cost:.2f}" if cost else "-",
+                f"{tokens / 1000:.0f}k" if tokens else "-",
+                age(max(stamps) if stamps else None),
+            ]
+        )
+
+    headers = ["SKILL", "HARNESS", "TESTS", "PASSED", "RATE", "TIME", "COST", "TOKENS", "LAST RUN"]
+    widths = [max(len(row[i]) for row in [headers, *table]) for i in range(len(headers))]
+
+    def line(cells: list[str]) -> str:
+        return "  ".join(
+            cell.ljust(width) for cell, width in zip(cells, widths, strict=True)
+        ).rstrip()
+
+    return "\n".join(
+        [line(headers), "  ".join("-" * width for width in widths), *(line(row) for row in table)]
+    )
+
+
 def render(harnesses: list[str], table: list[list[str]]) -> str:
     headers = ["SKILL"] + ["STATUS", "LAST TESTED", "TIME"] * len(harnesses)
     widths = [max(len(row[i]) for row in [headers, *table]) for i in range(len(headers))]

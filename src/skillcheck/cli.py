@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from . import results
+from . import cassette, lint, results
 from .config import HARNESS_ORDER, Config, installed
 from .harnesses import HARNESSES
 
@@ -62,6 +62,43 @@ def cmd_status(args) -> int:
     return 0
 
 
+def cmd_report(args) -> int:
+    rows = results.collect([Path(path) for path in (args.paths or ["."])])
+    if not rows:
+        print("no results recorded yet")
+        return 0
+    print(results.report(rows))
+    return 0
+
+
+def cmd_lint(args) -> int:
+    findings = lint.lint([Path(path) for path in (args.paths or ["."])], strict=args.strict)
+    for finding in findings:
+        if finding.code not in (args.ignore or []):
+            print(finding)
+
+    kept = [finding for finding in findings if finding.code not in (args.ignore or [])]
+    errors = sum(1 for finding in kept if finding.severity == lint.ERROR)
+    warnings = len(kept) - errors
+    print(f"\n{errors} error(s), {warnings} warning(s)")
+    return 1 if errors else 0
+
+
+def cmd_cassettes(args) -> int:
+    settings = Config.load(Path.cwd())
+    if args.clean:
+        removed = cassette.clean(Path.cwd(), settings.cassettes)
+        print(f"removed {removed} recorded run(s)")
+        return 0
+
+    directory = Path(settings.cassettes or Path.cwd() / cassette.DIRNAME)
+    tapes = sorted(directory.rglob("*.json")) if directory.is_dir() else []
+    for tape in tapes:
+        print(f"{tape.parent.name}  {tape.stem}")
+    print(f"\n{len(tapes)} recorded run(s) in {directory}")
+    return 0
+
+
 def cmd_doctor(args) -> int:
     settings = Config.load(Path.cwd())
     ready = installed()
@@ -76,7 +113,10 @@ def cmd_doctor(args) -> int:
     print(f"\nwould run against: {', '.join(settings.harnesses) or 'nothing'}")
     print(f"judge: {settings.judge} ({settings.judge_model})")
     print(f"timeout: {settings.timeout}s")
-    if not ready:
+    print(f"recorded runs: {settings.replay}")
+    if settings.container:
+        print(f"container: {settings.container}")
+    if not ready and settings.replay != "replay":
         print("\nno agent CLI found on PATH, so every test would skip")
         return 1
     return 0
@@ -111,6 +151,20 @@ def main_cli(argv: list[str] | None = None) -> int:
     status = sub.add_parser("status", help="show what was tested, and when")
     status.add_argument("paths", nargs="*", help="directories to search for results.json")
     status.set_defaults(func=cmd_status)
+
+    report = sub.add_parser("report", help="pass rate, time, and cost per skill")
+    report.add_argument("paths", nargs="*", help="directories to search for results.json")
+    report.set_defaults(func=cmd_report)
+
+    linter = sub.add_parser("lint", help="check skills without running a model")
+    linter.add_argument("paths", nargs="*", help="skill directories, or a tree to search")
+    linter.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    linter.add_argument("--ignore", action="append", help="a finding code to ignore, repeatable")
+    linter.set_defaults(func=cmd_lint)
+
+    tapes = sub.add_parser("cassettes", help="list or delete recorded runs")
+    tapes.add_argument("--clean", action="store_true", help="delete every recorded run")
+    tapes.set_defaults(func=cmd_cassettes)
 
     doctor = sub.add_parser("doctor", help="show which harnesses are installed")
     doctor.set_defaults(func=cmd_doctor)

@@ -31,7 +31,7 @@ def test_environment_selects_one_harness_a_group_or_all(monkeypatch, tmp_path):
     assert Config.load(tmp_path).harnesses == ["claude", "opencode"]
 
     monkeypatch.setenv("SKILLCHECK_HARNESS", "all")
-    assert Config.load(tmp_path).harnesses == ["claude", "codex", "opencode"]
+    assert Config.load(tmp_path).harnesses == ["claude", "codex", "opencode", "droid"]
 
 
 def test_pyproject_supplies_settings_and_the_environment_overrides_them(monkeypatch, tmp_path):
@@ -105,8 +105,12 @@ def test_status_summarises_one_row_per_skill_and_column_group_per_harness(tmp_pa
             skill / "results.json",
             name,
             {
-                "t[claude]": {"outcome": outcome, "harness": "claude", "ran_at": results.now(),
-                              "duration_s": 12.0},
+                "t[claude]": {
+                    "outcome": outcome,
+                    "harness": "claude",
+                    "ran_at": results.now(),
+                    "duration_s": 12.0,
+                },
                 "t[codex]": {"outcome": "skipped", "harness": "codex"},
             },
         )

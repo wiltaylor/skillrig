@@ -3,6 +3,8 @@
 [![CI](https://github.com/wiltaylor/pytest-skillcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/wiltaylor/pytest-skillcheck/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/pytest-skillcheck)](https://pypi.org/project/pytest-skillcheck/)
 
+![A robot teacher whacking a student robot with a book and pointing at its laptop, which shows an error](docs/skillcheck-teacher.png)
+
 Test agent skills against real coding agents. Run a prompt, assert on what
 actually happened, and grade the rest with an LLM.
 
